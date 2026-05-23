@@ -39,6 +39,15 @@ describe("browser model selection matchers", () => {
     expect(testIdTokens.some((t) => t.includes("model-switcher-gpt-5.2-pro"))).toBe(true);
   });
 
+  it("includes Extended Pro aliases for pro targets", () => {
+    const { labelTokens, testIdTokens } = buildModelMatchersLiteralForTest("gpt-5.4-pro");
+    expectContains(labelTokens, "extended");
+    expectContains(labelTokens, "extended pro");
+    expectContains(labelTokens, "research grade intelligence");
+    expectContains(testIdTokens, "extended");
+    expectContains(testIdTokens, "extended-pro");
+  });
+
   it("includes pro + 5.2 tokens for gpt-5.2-pro", () => {
     const { labelTokens, testIdTokens } = buildModelMatchersLiteralForTest("gpt-5.2-pro");
     expect(labelTokens.some((t) => t.includes("pro"))).toBe(true);
@@ -69,5 +78,33 @@ describe("browser model selection matchers", () => {
     expect(expression).toContain("const closeMenu = () =>");
     expect(expression).toContain("key: 'Escape'");
     expect(expression).toContain("closeMenu();");
+  });
+
+  it("does not require the legacy model button when keeping the current model", () => {
+    const expression = buildModelSelectionExpressionForTest("gpt-5.4-pro");
+    expect(expression.indexOf("MODEL_STRATEGY === 'current'")).toBeLessThan(
+      expression.indexOf("return { status: 'button-missing' }"),
+    );
+    expect(expression).toContain("button.__composer-pill");
+  });
+
+  it("uses the composer pill as the model selector fallback", () => {
+    const expression = buildModelSelectionExpressionForTest("gpt-5.4-pro");
+    expect(expression).toContain('button.__composer-pill[aria-haspopup="menu"]');
+    expect(expression.indexOf("button.__composer-pill")).toBeLessThan(
+      expression.indexOf("return { status: 'button-missing' }"),
+    );
+  });
+
+  it("accepts Extended Pro as the generic ChatGPT pro label", () => {
+    const expression = buildModelSelectionExpressionForTest("gpt-5.4-pro");
+    expect(expression).toContain("normalizedText === 'extended'");
+    expect(expression).toContain("extended pro");
+    expect(expression).toContain("research grade intelligence");
+  });
+
+  it("falls back to a global candidate scan when the picker is not rendered as a menu", () => {
+    const expression = buildModelSelectionExpressionForTest("gpt-5.4-pro");
+    expect(expression).toContain(": Array.from(document.querySelectorAll(");
   });
 });

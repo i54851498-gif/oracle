@@ -112,8 +112,25 @@ function buildModelSelectionExpression(
     const wantsPro = normalizedTarget.includes(' pro') || normalizedTarget.endsWith(' pro') || normalizedTokens.includes('pro');
     const wantsInstant = normalizedTarget.includes('instant');
     const wantsThinking = normalizedTarget.includes('thinking');
+    const isGenericProCandidate = (normalizedText, normalizedTestId = '') =>
+      wantsPro &&
+      (
+        normalizedText === 'extended' ||
+        normalizedText.startsWith('extended ') ||
+        normalizedText.includes('extended pro') ||
+        normalizedText.includes('research grade intelligence') ||
+        normalizedText.includes('research grade') ||
+        normalizedTestId.includes('extended-pro') ||
+        normalizedTestId.includes('extendedpro') ||
+        normalizedTestId.includes('extended')
+      );
 
     const button = document.querySelector(BUTTON_SELECTOR);
+    const getButtonLabel = () =>
+      (button?.textContent ?? document.querySelector('button.__composer-pill')?.textContent ?? '').trim();
+    if (MODEL_STRATEGY === 'current') {
+      return { status: 'already-selected', label: getButtonLabel() };
+    }
     if (!button) {
       return { status: 'button-missing' };
     }
@@ -138,14 +155,11 @@ function buildModelSelectionExpression(
       } catch {}
     };
 
-    const getButtonLabel = () => (button.textContent ?? '').trim();
-    if (MODEL_STRATEGY === 'current') {
-      return { status: 'already-selected', label: getButtonLabel() };
-    }
     const buttonMatchesTarget = () => {
       const normalizedLabel = normalizeText(getButtonLabel());
       if (!normalizedLabel) return false;
-      if (desiredVersion) {
+      const genericProLabel = isGenericProCandidate(normalizedLabel);
+      if (desiredVersion && !genericProLabel) {
         if (desiredVersion === '5-4' && !normalizedLabel.includes('5 4')) return false;
         if (desiredVersion === '5-2' && !normalizedLabel.includes('5 2')) return false;
         if (desiredVersion === '5-1' && !normalizedLabel.includes('5 1')) return false;
@@ -272,6 +286,9 @@ function buildModelSelectionExpression(
           score += tokenWeight;
         }
       }
+      if (isGenericProCandidate(normalizedText, normalizedTestId)) {
+        score += 240;
+      }
       if (targetWords.length > 1) {
         let missing = 0;
         for (const word of targetWords) {
@@ -312,9 +329,10 @@ function buildModelSelectionExpression(
       // Walk through every menu item and keep whichever earns the highest score.
       let bestMatch = null;
       const menus = Array.from(document.querySelectorAll(${menuContainerLiteral}));
-      for (const menu of menus) {
-        const buttons = Array.from(menu.querySelectorAll(${menuItemLiteral}));
-        for (const option of buttons) {
+      const candidates = menus.length > 0
+        ? menus.flatMap((menu) => Array.from(menu.querySelectorAll(${menuItemLiteral})))
+        : Array.from(document.querySelectorAll(${menuItemLiteral}));
+      for (const option of candidates) {
           const text = option.textContent ?? '';
           const normalizedText = normalizeText(text);
           const testid = option.getAttribute('data-testid') ?? '';
@@ -326,7 +344,6 @@ function buildModelSelectionExpression(
           if (!bestMatch || score > bestMatch.score) {
             bestMatch = { node: option, label, score, testid, normalizedText };
           }
-        }
       }
       return bestMatch;
     };
@@ -516,8 +533,12 @@ function buildModelMatchersLiteral(targetModel: string): {
   }
   // Pro / research variants
   if (base.includes("pro")) {
+    push("extended", labelTokens);
     push("proresearch", labelTokens);
+    push("extended pro", labelTokens);
+    push("extendedpro", labelTokens);
     push("research grade", labelTokens);
+    push("research grade intelligence", labelTokens);
     push("advanced reasoning", labelTokens);
     if (base.includes("5.4") || base.includes("5-4") || base.includes("54")) {
       testIdTokens.add("gpt-5.4-pro");
@@ -541,6 +562,9 @@ function buildModelMatchersLiteral(targetModel: string): {
     }
     testIdTokens.add("pro");
     testIdTokens.add("proresearch");
+    testIdTokens.add("extended");
+    testIdTokens.add("extended-pro");
+    testIdTokens.add("extendedpro");
   }
   base
     .split(/\s+/)
